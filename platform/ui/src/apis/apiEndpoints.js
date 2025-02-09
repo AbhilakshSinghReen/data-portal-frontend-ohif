@@ -8,6 +8,11 @@ const apiEndpoints = {
   model: studyUid => `/dicom-web/run-model/${studyUid}`,
   taskStatus: taskId => `dicom-web/tasks/${taskId}`,
   classificationOutput: studyUid => `dicom-web/manage/studies/${studyUid}/attachments/modelOutput`,
+
+  modelInference: {
+    inferAsync: () => '/model-inference/infer-async/',
+    inferSync: () => '/model-inference/infer-sync/',
+  },
 };
 
 export default apiEndpoints;

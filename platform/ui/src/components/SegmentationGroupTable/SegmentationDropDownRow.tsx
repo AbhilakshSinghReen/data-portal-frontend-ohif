@@ -20,6 +20,7 @@ import {
   Types as cstTypes,
   utilities as cstUtils,
 } from '@cornerstonejs/tools';
+import apiClient from '../../apis/apiClient';
 
 // import App, { commandsManager, extensionManager, servicesManager } from '../../../../app/src/App';
 function SegmentationDropDownRow({
@@ -40,191 +41,170 @@ function SegmentationDropDownRow({
     onActiveSegmentationChange(option.value); // Notify the parent
   };
 
+  // Interactive Segmentation state and functions start here
+
   const [loading, setLoading] = useState(false);
-  // const [loading2, setLoading2] = useState(false);
 
-  const handleClick = async () => {
-    setLoading(true);
+  const normalizeToUint8 = pixelData => {
+    const min = pixelData.reduce((a, b) => Math.min(a, b));
+    const max = pixelData.reduce((a, b) => Math.max(a, b));
 
-    console.log('servicesManager:', servicesManager);
-
-    if (!servicesManager || !servicesManager.services) {
-      console.error('servicesManager or servicesManager.services is undefined');
-      setLoading(false);
-      return;
+    if (min === max) {
+      return Array.from(new Uint8Array(pixelData.length).fill(0));
     }
 
-    const { segmentationService, viewportGridService } = servicesManager.services;
+    return Array.from(new Uint8Array(pixelData, val => ((val - min) / (max - min)) * 255));
+  };
+
+  const getLabelmapDimensions = () => {
+    const { segmentationService } = servicesManager.services;
+
+    const segmentationId = activeSegmentation.id;
+    const labelmapVolume = segmentationService.getLabelmapVolume(segmentationId);
+
+    const { dimensions } = labelmapVolume;
+    return dimensions;
+  };
+
+  const getNormalizedPixelDataArrayForCurrentSlice = async () => {
+    const { viewportGridService } = servicesManager.services;
     const { activeViewportId } = viewportGridService.getState();
     const { viewport } = getEnabledElementByViewportId(activeViewportId) || {};
     const imageId = viewport.getCurrentImageId();
+
+    const image = await imageLoader.loadAndCacheImage(imageId);
+    const pixelData = image.getPixelData();
+
+    const pixelDataArray = Array.from(pixelData);
+    const normalizedPixelDataArray = normalizeToUint8(pixelDataArray);
+    return normalizedPixelDataArray;
+  };
+
+  const getSegmentationPixelDataArrayForCurrentSlice = () => {
+    const { segmentationService, viewportGridService } = servicesManager.services;
+    const { activeViewportId } = viewportGridService.getState();
+    const { viewport } = getEnabledElementByViewportId(activeViewportId) || {};
     const sliceID = viewport.getCurrentImageIdIndex();
 
     const segmentationId = activeSegmentation.id;
 
-    // Continue with segmentation logic...
     const labelmapVolume = segmentationService.getLabelmapVolume(segmentationId);
-    const { dimensions } = labelmapVolume;
+    const dimensions = getLabelmapDimensions();
+
     const scalarData = labelmapVolume.getScalarData();
     const width = dimensions[0];
     const height = dimensions[1];
     const startIndex = sliceID * width * height;
     const slicedData = scalarData.slice(startIndex, startIndex + width * height);
 
-    console.log(`imageID: ${imageId}  sliceID: ${sliceID}`);
-    console.log(`Seg_ID: ${segmentationId}`);
-
-    try {
-      const image = await imageLoader.loadAndCacheImage(imageId);
-      const pixelData = image.getPixelData(); // Uint16Array or Int16Array
-
-      // Convert pixelData to a regular array for transmission
-      const pixelDataArray = Array.from(pixelData);
-      const old_seg_data_array = Array.from(slicedData);
-
-      // Send pixelData and imageId in the POST request
-      const response = await fetch('http://localhost:8000/api/segment-image-interactive', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pixelData: pixelDataArray, old_seg_data: old_seg_data_array }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Network response was not ok: ' + response.statusText);
-      }
-
-      const { segmentation_data } = await response.json();
-      console.log('Segmentation Data:', segmentation_data);
-
-      // Check if segmentation_data matches the expected size
-      if (segmentation_data.length !== width * height) {
-        console.error(
-          `Segmentation data size (${segmentation_data.length}) does not match labelmap dimensions (${width * height})`
-        );
-        return;
-      }
-
-      // Update the scalar data with the new segmentation data
-      for (let i = 0; i < segmentation_data.length; i++) {
-        scalarData[startIndex + i] = segmentation_data[i];
-      }
-
-      const updatedSegmentSlice = scalarData.slice(startIndex, startIndex + width * height);
-      console.log('Updated Segment Slice:', updatedSegmentSlice);
-
-      // Notify about the segmentation data modification
-      const eventDetail = { segmentationId: segmentationId };
-      const event = new CustomEvent(csToolsEnums.Events.SEGMENTATION_DATA_MODIFIED, {
-        detail: eventDetail,
-      });
-      eventTarget.dispatchEvent(event);
-
-      const segmentation = segmentationService.getSegmentation(segmentationId);
-
-      if (segmentation === undefined) {
-        console.error('Segmentation not found!');
-        return;
-      }
-
-      segmentationService._broadcastEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
-        segmentation,
-      });
-    } catch (error) {
-      console.error('Error fetching segmentation data:', error);
-    } finally {
-      setLoading(false); // Reset loading state
-    }
+    const segmentationPixelData = Array.from(slicedData);
+    return segmentationPixelData;
   };
 
-  const handleClick2 = async () => {
-    setLoading(true);
-
-    if (!servicesManager || !servicesManager.services) {
-      console.error('servicesManager or servicesManager.services is undefined');
-      setLoading(false);
-      return;
-    }
-
+  const updateSegmentationForCurrentSlice = updatedSegmentationData => {
     const { segmentationService, viewportGridService } = servicesManager.services;
     const { activeViewportId } = viewportGridService.getState();
     const { viewport } = getEnabledElementByViewportId(activeViewportId) || {};
-    const imageId = viewport.getCurrentImageId();
     const sliceID = viewport.getCurrentImageIdIndex();
-
     const segmentationId = activeSegmentation.id;
 
-    console.log(`imageID: ${imageId}  sliceID: ${sliceID}`);
-    console.log(`Seg_ID: ${segmentationId}`);
+    const labelmapVolume = segmentationService.getLabelmapVolume(segmentationId);
+    const { dimensions } = labelmapVolume;
+    const scalarData = labelmapVolume.getScalarData();
+    const width = dimensions[0];
+    const height = dimensions[1];
+
+    if (updatedSegmentationData.length !== width * height) {
+      console.error(
+        `updatedSegmentationData.length (${updatedSegmentationData.length}) ` +
+          `does not match labelmap dimensions (${width} x ${height} = ${width * height})`
+      );
+
+      return false;
+    }
+
+    const startIndex = sliceID * width * height;
+
+    // Update the scalar data with the new segmentation data
+    for (let i = 0; i < updatedSegmentationData.length; i++) {
+      scalarData[startIndex + i] = updatedSegmentationData[i];
+    }
+
+    const updatedSegmentSlice = scalarData.slice(startIndex, startIndex + width * height);
+    console.log('Updated Segment Slice:', updatedSegmentSlice);
+
+    // Notify about the segmentation data modification
+    const eventDetail = { segmentationId: segmentationId };
+    const event = new CustomEvent(csToolsEnums.Events.SEGMENTATION_DATA_MODIFIED, {
+      detail: eventDetail,
+    });
+    eventTarget.dispatchEvent(event);
+
+    const segmentation = segmentationService.getSegmentation(segmentationId);
+
+    if (segmentation === undefined) {
+      console.error('Segmentation not found!');
+      return;
+    }
+
+    segmentationService._broadcastEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
+      segmentation,
+    });
+  };
+
+  const handleSegmentButtonClick = async () => {
+    setLoading(true);
 
     try {
-      const image = await imageLoader.loadAndCacheImage(imageId);
-      const pixelData = image.getPixelData(); // Uint16Array or Int16Array
+      const normalizedPixelDataArray = await getNormalizedPixelDataArrayForCurrentSlice();
+      const labelmapDimensions = getLabelmapDimensions();
 
-      // Convert pixelData to a regular array for transmission
-      const pixelDataArray = Array.from(pixelData);
-
-      // Send pixelData and imageId in the POST request
-      const response = await fetch('http://localhost:8000/api/segment-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pixelData: pixelDataArray }),
+      const responseData = await apiClient.runModelInferenceSync('INTERACTIVE_SEGMENTATION', {
+        mode: 'FORWARD',
+        image_pixel_data: normalizedPixelDataArray,
+        labelmap_dimensions: labelmapDimensions.slice(0, 2),
       });
 
-      if (!response.ok) {
-        throw new Error('Network response was not ok: ' + response.statusText);
-      }
+      const { result } = responseData;
+      const { model_output } = result;
+      const { updated_segmentation_pixel_data } = model_output;
 
-      const { segmentation_data } = await response.json();
-      console.log('Segmentation Data:', segmentation_data);
+      updateSegmentationForCurrentSlice(updated_segmentation_pixel_data);
+    } catch (error) {
+      console.error('Error fetching segmentation data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      // Continue with segmentation logic...
-      const labelmapVolume = segmentationService.getLabelmapVolume(segmentationId);
-      const { dimensions } = labelmapVolume;
-      const scalarData = labelmapVolume.getScalarData();
-      const width = dimensions[0];
-      const height = dimensions[1];
+  const handleInteractiveSegmentButtonClick = async () => {
+    setLoading(true);
 
-      // Check if segmentation_data matches the expected size
-      if (segmentation_data.length !== width * height) {
-        console.error(
-          `Segmentation data size (${segmentation_data.length}) does not match labelmap dimensions (${width * height})`
-        );
-        return;
-      }
+    try {
+      const imageNormalizedPixelDataArray = await getNormalizedPixelDataArrayForCurrentSlice();
+      const segmentationPixelDataArray = getSegmentationPixelDataArrayForCurrentSlice();
+      const labelmapDimensions = getLabelmapDimensions();
 
-      const startIndex = sliceID * width * height;
-
-      // Update the scalar data with the new segmentation data
-      for (let i = 0; i < segmentation_data.length; i++) {
-        scalarData[startIndex + i] = segmentation_data[i];
-      }
-
-      const updatedSegmentSlice = scalarData.slice(startIndex, startIndex + width * height);
-      console.log('Updated Segment Slice:', updatedSegmentSlice);
-
-      // Notify about the segmentation data modification
-      const eventDetail = { segmentationId: segmentationId };
-      const event = new CustomEvent(csToolsEnums.Events.SEGMENTATION_DATA_MODIFIED, {
-        detail: eventDetail,
+      const responseData = await apiClient.runModelInferenceSync('INTERACTIVE_SEGMENTATION', {
+        mode: 'INTERACTIVE',
+        image_pixel_data: imageNormalizedPixelDataArray,
+        corrected_segmentation_pixel_data: segmentationPixelDataArray,
+        labelmap_dimensions: labelmapDimensions.slice(0, 2),
       });
-      eventTarget.dispatchEvent(event);
 
-      const segmentation = segmentationService.getSegmentation(segmentationId);
+      const { result } = responseData;
+      const { model_output } = result;
+      const { updated_segmentation_pixel_data } = model_output;
 
-      if (segmentation === undefined) {
-        console.error('Segmentation not found!');
-        return;
-      }
-
-      segmentationService._broadcastEvent(segmentationService.EVENTS.SEGMENTATION_DATA_MODIFIED, {
-        segmentation,
-      });
+      updateSegmentationForCurrentSlice(updated_segmentation_pixel_data);
     } catch (error) {
       console.error('Error fetching segmentation data:', error);
     } finally {
       setLoading(false); // Reset loading state
     }
   };
+
+  // Interactive Segmentation state and functions end here
 
   const selectOptions = segmentations.map(s => ({
     value: s.id,
@@ -367,7 +347,7 @@ function SegmentationDropDownRow({
           onClick={e => {
             e.stopPropagation();
             if (!loading) {
-              handleClick(); // Call the new action handler
+              handleInteractiveSegmentButtonClick(); // Call the new action handler
             }
           }}
         >
@@ -405,7 +385,7 @@ function SegmentationDropDownRow({
           onClick={e => {
             e.stopPropagation();
             if (!loading) {
-              handleClick2(); // Call the action handler
+              handleSegmentButtonClick(); // Call the action handler
             }
           }}
         >

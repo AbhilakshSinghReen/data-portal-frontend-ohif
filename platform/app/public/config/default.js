@@ -1,4 +1,5 @@
-const apiBaseUrl = 'https://aih.cse.iitd.ac.in/api/v1';
+// const apiBaseUrl = 'https://aih.cse.iitd.ac.in/api/v1';
+const apiBaseUrl = 'http://localhost:8000/api/v1';
 
 const availableMlModels = {
   'LQ Adapter': {

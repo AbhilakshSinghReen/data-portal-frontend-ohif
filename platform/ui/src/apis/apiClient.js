@@ -102,6 +102,22 @@ class APIClient {
     return res;
   }
 
+  async runModelInferenceSync(modelType, modelInputs) {
+    const requestBody = {
+      model_type: modelType,
+      model_inputs: modelInputs,
+    };
+
+    const response = await this.makeRequest(
+      'POST',
+      apiEndpoints.modelInference.inferSync(),
+      requestBody,
+      {},
+      true
+    );
+    return response;
+  }
+
   async getAccessList(studyUid) {
     ////console.log('sending share list api', apiEndpoints.getAccessList(studyUid));
     return await this.makeRequest('GET', apiEndpoints.getAccessList(studyUid), undefined, {}, true);
@@ -136,8 +152,9 @@ class APIClient {
     console.log(frames);
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.model(studyUid),
+      apiEndpoints.modelInference.inferAsync(),
       {
+        study_uid: studyUid,
         model: model,
         series: series,
         frames: frames,
@@ -160,8 +177,9 @@ class APIClient {
 
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.model(studyUid),
+      apiEndpoints.modelInference.inferAsync(),
       {
+        study_uid: studyUid,
         model: 'MAMMO',
       },
       {},
@@ -185,8 +203,9 @@ class APIClient {
     setToastMessage('Starting GBC model processing for study:');
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.model(studyUid),
+      apiEndpoints.modelInference.inferAsync(),
       {
+        study_uid: studyUid,
         model: 'GBC',
       },
       {},
@@ -221,8 +240,9 @@ class APIClient {
     setToastMessage('Starting X-Ray model processing for study:');
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.model(studyUid),
+      apiEndpoints.modelInference.inferAsync(),
       {
+        study_uid: studyUid,
         model: 'CXR',
       },
       {},
