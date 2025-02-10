@@ -285,13 +285,13 @@ function ActionButtons({ disabled = false, data = null, orthancId = null }) {
                 className="ohif-scrollbar max-h-112 mb-4 overflow-auto rounded-lg border border-gray-700 bg-gray-800 p-4 shadow-md"
               >
                 <p className="text-sm font-semibold text-green-400">Annotation No. {index + 1}</p>
-                <p className="mb-2 text-sm">
-                  <span className="text-blue-300">Top Left:</span> [{item?.baseDisplayText[0]},{' '}
-                  {item?.baseDisplayText[1]}]
+                {/* <p className="mb-2 text-sm">
+                  <span className="text-blue-300">Top Left:</span> [{item?.baseDisplayText[0] ?? ''}
+                  , {item?.baseDisplayText[1] ?? ''}]
                   <br />
-                  <span className="text-blue-300">Bottom Right:</span> [{item?.baseLabel[0]},{' '}
-                  {item?.baseLabel[1]}]
-                </p>
+                  <span className="text-blue-300">Bottom Right:</span> [{item?.baseLabel[0] ?? ''},{' '}
+                  {item?.baseLabel[1] ?? ''}]
+                </p> */}
 
                 <div className="form-group">
                   <div className="mb-2 items-center">
@@ -345,11 +345,11 @@ function ActionButtons({ disabled = false, data = null, orthancId = null }) {
               >
                 <p className="text-sm font-semibold text-green-400">Annotation No. {index + 1}</p>
                 <p className="mb-2 text-sm">
-                  <span className="text-blue-300">Top Left:</span> [{item.baseDisplayText[0]},{' '}
-                  {item.baseDisplayText[1]}]
+                  <span className="text-blue-300">Top Left:</span> [{item.baseDisplayText[0] ?? ''},{' '}
+                  {item.baseDisplayText[1] ?? ''}]
                   <br />
-                  <span className="text-blue-300">Bottom Right:</span> [{item.baseLabel[0]},{' '}
-                  {item.baseLabel[1]}]
+                  <span className="text-blue-300">Bottom Right:</span> [{item.baseLabel[0] ?? ''},{' '}
+                  {item.baseLabel[1] ?? ''}]
                 </p>
 
                 <div className="form-group">

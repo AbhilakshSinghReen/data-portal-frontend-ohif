@@ -152,7 +152,7 @@ class APIClient {
     console.log(frames);
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.modelInference.inferAsync(),
+      apiEndpoints.model(studyUid),
       {
         study_uid: studyUid,
         model: model,
@@ -177,7 +177,7 @@ class APIClient {
 
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.modelInference.inferAsync(),
+      apiEndpoints.model(studyUid),
       {
         study_uid: studyUid,
         model: 'MAMMO',
@@ -203,7 +203,7 @@ class APIClient {
     setToastMessage('Starting GBC model processing for study:');
     const response = await this.makeRequest(
       'POST',
-      apiEndpoints.modelInference.inferAsync(),
+      apiEndpoints.model(studyUid),
       {
         study_uid: studyUid,
         model: 'GBC',
